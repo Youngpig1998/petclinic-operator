@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -43,6 +45,10 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+
+	utilruntime.Must(corev1.AddToScheme(scheme))
 
 	utilruntime.Must(examplev1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
@@ -80,7 +86,9 @@ func main() {
 
 	if err = (&controllers.PetClinicReconciler{
 		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("PetClinic"),
 		Scheme: mgr.GetScheme(),
+		Config: mgr.GetConfig(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PetClinic")
 		os.Exit(1)

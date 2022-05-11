@@ -28,8 +28,9 @@ type PetClinicSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of PetClinic. Edit petclinic_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Replicas    int32             `json:"replicas"`
+	MysqlActive bool              `json:"mysqlActive"`
+	Mysql       map[string]string `json:"mysql,omitempty" protobuf:"bytes,8,rep,name=mysql"`
 }
 
 // PetClinicStatus defines the observed state of PetClinic
