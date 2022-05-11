@@ -287,6 +287,12 @@ func Deployment(serviceName string, app *examplev1beta1.PetClinic) resources.Rec
 					},
 				},
 				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{
+						Image:           "busybox:1.30",
+						ImagePullPolicy: "IfNotPresent",
+						Name:            "test-mysql",
+						Command:         []string{"sh", "-c", "until ping mysql -c 1 ; do echo waiting for mysql...;sleep 2;done;"},
+					}},
 					Containers: []corev1.Container{{
 						Image:           imageName,
 						ImagePullPolicy: "IfNotPresent",

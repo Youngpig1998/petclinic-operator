@@ -18,18 +18,17 @@ package controllers
 
 import (
 	"context"
+	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/bootstrap"
 	"github.com/Youngpig1998/petClinic-operator/internal/operator"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"time"
-
-	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"time"
 )
 
 var servicesName [5]string = [5]string{"customers", "vets", "visits", "web", "gateway"}
@@ -110,7 +109,7 @@ func (r *PetClinicReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	time.Sleep(time.Duration(5) * time.Second)
+	time.Sleep(time.Duration(10) * time.Second)
 
 	//We create petclinic services
 	for i := 0; i < 5; i++ {
