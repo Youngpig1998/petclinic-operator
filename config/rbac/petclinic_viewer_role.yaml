@@ -1,0 +1,20 @@
+# permissions for end users to view petclinics.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: petclinic-viewer-role
+rules:
+- apiGroups:
+  - example.njtech.edu.cn
+  resources:
+  - petclinics
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - example.njtech.edu.cn
+  resources:
+  - petclinics/status
+  verbs:
+  - get
