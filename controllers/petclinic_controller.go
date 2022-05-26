@@ -18,11 +18,14 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/bootstrap"
 	"github.com/Youngpig1998/petClinic-operator/internal/operator"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,6 +35,8 @@ import (
 )
 
 var servicesName [5]string = [5]string{"customers", "vets", "visits", "web", "gateway"}
+
+var isWatchPod bool = false
 
 var (
 	controllerManagerName = "petclinic-operator-controller-manager"
@@ -52,6 +57,7 @@ type PetClinicReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -92,7 +98,15 @@ func (r *PetClinicReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	//First we create mongodb services,include geo,user,profile,recommendation,rate,reservation
+	// just a test
+	mysqls := instance.Spec.Mysql
+	if mysqls == nil {
+		log.Info("Mysql iudshfbidsbfmjsdabnfuiwebfjhksxb ds nfdjksfnb kjdsa bfuiawbf jkdsb njksdabnf kjw ndnsjkf ")
+	} else {
+		log.Info(mysqls["sdsd"])
+	}
+
+	//First we create mysql statefulset
 
 	if instance.Spec.MysqlActive == true {
 		statefulSet := operator.StatefulSet("mysql", instance)
@@ -111,7 +125,7 @@ func (r *PetClinicReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	time.Sleep(time.Duration(10) * time.Second)
 
-	//We create petclinic services
+	//We create petclinic deployments & services
 	for i := 0; i < 5; i++ {
 		deploy := operator.Deployment(servicesName[i], instance)
 		deployName := servicesName[i]
@@ -135,53 +149,23 @@ func (r *PetClinicReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	}
 
-	////Then we create consul service
-	//deploymentForConsul := operator.DeploymentForConsul(instance)
-	//err = bootstrapClient.CreateResource("consul", deploymentForConsul)
-	//if err != nil {
-	//	log.Error(err, "failed to create operator's consul Deployment", "Name", "consul")
-	//	return ctrl.Result{}, err
-	//}
-	//
-	////Then we create jaeger service
-	//deploymentForJaeger := operator.DeploymentForJaeger(instance)
-	//err = bootstrapClient.CreateResource("jaeger", deploymentForJaeger)
-	//if err != nil {
-	//	log.Error(err, "failed to create operator's jaeger Deployment", "Name", "jaeger")
-	//	return ctrl.Result{}, err
-	//}
-	//
-	////Then we create logic services,include search geo rate profile recommendation user
-	//
-	//for i := 0; i < 8; i++ {
-	//
-	//	var port int32 = 0
-	//	if servicesName[i] == "rate" {
-	//		port = 8084
-	//	} else if servicesName[i] == "profile" {
-	//		port = 8081
-	//	} else if servicesName[i] == "reservation" {
-	//		port = 8087
-	//	} else if servicesName[i] == "user" {
-	//		port = 8086
-	//	} else if servicesName[i] == "geo" {
-	//		port = 8083
-	//	} else if servicesName[i] == "frontend" {
-	//		port = 5000
-	//	} else if servicesName[i] == "search" {
-	//		port = 8082
-	//	} else {
-	//		port = 8085
-	//	}
-	//
-	//	deploymentForLogic := operator.DeploymentForLogic(servicesName[i], port, instance)
-	//	err = bootstrapClient.CreateResource(servicesName[i], deploymentForLogic)
-	//	if err != nil {
-	//		log.Error(err, "failed to create operator's logic Deployment", "Name", servicesName[i])
-	//		return ctrl.Result{}, err
-	//	}
-	//
-	//}
+	//We create petclinic hpas
+	for i := 0; i < 5; i++ {
+		hpa := operator.HorizontalPodAutoscaler(servicesName[i], instance)
+		hpaName := servicesName[i]
+		err = bootstrapClient.CreateResource(hpaName, hpa)
+		if err != nil {
+			log.Error(err, "failed to create operator's hpa", "Name", hpaName)
+			return ctrl.Result{}, err
+		}
+
+	}
+
+	if instance.Spec.ScaleCrossCloud == true && isWatchPod == false {
+		isWatchPod = true
+		time.Sleep(15 * time.Second)
+		go r.WatchPod(ctx, req, instance)
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -191,4 +175,47 @@ func (r *PetClinicReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&examplev1beta1.PetClinic{}).
 		Complete(r)
+}
+
+func (r *PetClinicReconciler) WatchPod(ctx context.Context, req ctrl.Request, app *examplev1beta1.PetClinic) {
+
+	log := r.Log.WithValues("pods in cluster", req.NamespacedName)
+
+	for {
+
+		pods := &corev1.PodList{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Pod",
+				APIVersion: "",
+			},
+			ListMeta: metav1.ListMeta{
+				SelfLink:           "",
+				ResourceVersion:    "",
+				Continue:           "",
+				RemainingItemCount: nil,
+			},
+			Items: nil,
+		}
+		//
+		err := r.List(ctx, pods)
+
+		if err != nil {
+			log.Info("No pods")
+		}
+
+		for i := 0; i < len(pods.Items); i++ {
+			if pods.Items[i].Namespace != app.Namespace {
+				continue
+			} else {
+				if pods.Items[i].Status.Phase == "Pending" {
+					fmt.Println(pods.Items[0].Name)
+					fmt.Println(pods.Items[0].Status.Reason)
+					fmt.Println(pods.Items[0].Status.Message)
+				}
+			}
+
+		}
+
+		time.Sleep(10 * time.Second)
+	}
 }

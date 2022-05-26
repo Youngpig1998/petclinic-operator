@@ -4,9 +4,11 @@ import (
 	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources/deployments"
+	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources/horizontalpodautoscalers"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources/services"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources/statefulsets"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -293,6 +295,7 @@ func Deployment(serviceName string, app *examplev1beta1.PetClinic) resources.Rec
 						Name:            "test-mysql",
 						Command:         []string{"sh", "-c", "until ping mysql -c 1 ; do echo waiting for mysql...;sleep 2;done;"},
 					}},
+					RestartPolicy: corev1.RestartPolicy("Always"),
 					Containers: []corev1.Container{{
 						Image:           imageName,
 						ImagePullPolicy: "IfNotPresent",
@@ -314,12 +317,12 @@ func Deployment(serviceName string, app *examplev1beta1.PetClinic) resources.Rec
 						},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
-								//"cpu":    resource.MustParse("200m"),
-								"memory": resource.MustParse("512Mi"),
+								"cpu":    resource.MustParse("2"),
+								"memory": resource.MustParse("1024Mi"),
 							},
 							Requests: corev1.ResourceList{
-								//"cpu":    resource.MustParse("200m"),
-								"memory": resource.MustParse("128Mi"),
+								"cpu":    resource.MustParse("1"),
+								"memory": resource.MustParse("512Mi"),
 							},
 						},
 					}},
@@ -329,6 +332,50 @@ func Deployment(serviceName string, app *examplev1beta1.PetClinic) resources.Rec
 	}
 
 	return deployments.From(deployment)
+}
+
+func HorizontalPodAutoscaler(horizontalPodAutoscalerName string, app *examplev1beta1.PetClinic) resources.Reconcileable {
+
+	horizontalPodAutoscaler := &autoscalingv2beta2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      horizontalPodAutoscalerName,
+			Namespace: app.Namespace,
+		},
+		Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				Name:       horizontalPodAutoscalerName,
+				APIVersion: "apps/v1",
+			},
+			MinReplicas: pointer.Int32Ptr(app.Spec.Replicas),
+			MaxReplicas: 5,
+			Metrics: []autoscalingv2beta2.MetricSpec{
+				{
+					Type: "Resource",
+					Resource: &autoscalingv2beta2.ResourceMetricSource{
+						Name: "cpu",
+						Target: autoscalingv2beta2.MetricTarget{
+							Type:               "Utilization",
+							AverageUtilization: pointer.Int32Ptr(40),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return horizontalpodautoscalers.From(horizontalPodAutoscaler)
+}
+
+func getKeys(m map[string]string) []string {
+	// 数组默认长度为map长度,后面append时,不需要重新申请内存和拷贝,效率很高
+	j := 0
+	keys := make([]string, len(m))
+	for k := range m {
+		keys[j] = k
+		j++
+	}
+	return keys
 }
 
 //func DeploymentForLogic(deployName string, port int32, app *examplev1beta1.PetClinic) resources.Reconcileable {

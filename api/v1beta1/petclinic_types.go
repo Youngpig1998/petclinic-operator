@@ -28,9 +28,16 @@ type PetClinicSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Replicas    int32             `json:"replicas"`
-	MysqlActive bool              `json:"mysqlActive"`
-	Mysql       map[string]string `json:"mysql,omitempty" protobuf:"bytes,8,rep,name=mysql"`
+	//
+	Replicas int32 `json:"replicas"`
+
+	MysqlActive bool `json:"mysqlActive"`
+
+	ScaleCrossCloud bool `json:"scaleCrossCloud"`
+
+	Mysql map[string]string `json:"mysql,omitempty" protobuf:"bytes,8,rep,name=mysql"`
+
+	Hpa map[string]string `json:"hpa,omitempty" protobuf:"bytes,8,rep,name=hpa"`
 }
 
 // PetClinicStatus defines the observed state of PetClinic

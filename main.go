@@ -19,22 +19,22 @@ package main
 import (
 	"flag"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
+	"github.com/Youngpig1998/petClinic-operator/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
-	"github.com/Youngpig1998/petClinic-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -51,6 +51,8 @@ func init() {
 	utilruntime.Must(corev1.AddToScheme(scheme))
 
 	utilruntime.Must(examplev1beta1.AddToScheme(scheme))
+
+	utilruntime.Must(autoscalingv2beta2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
