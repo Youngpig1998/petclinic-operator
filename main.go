@@ -30,6 +30,7 @@ import (
 
 	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
 	"github.com/Youngpig1998/petClinic-operator/controllers"
+	oamv1beta1 "github.com/oam-dev/kubevela/apis/core.oam.dev/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -53,6 +54,8 @@ func init() {
 	utilruntime.Must(examplev1beta1.AddToScheme(scheme))
 
 	utilruntime.Must(autoscalingv2beta2.AddToScheme(scheme))
+
+	utilruntime.Must(oamv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
