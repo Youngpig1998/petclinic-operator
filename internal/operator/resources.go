@@ -3,12 +3,16 @@ package operator
 import (
 	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources"
+	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources/applications"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources/deployments"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources/horizontalpodautoscalers"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources/services"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/resources/statefulsets"
+	"github.com/oam-dev/kubevela/apis/core.oam.dev/common"
+	oamv1beta1 "github.com/oam-dev/kubevela/apis/core.oam.dev/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -168,6 +172,102 @@ func StatefulSet(servicesName string, app *examplev1beta1.PetClinic) resources.R
 }
 
 func Deployment(serviceName string, app *examplev1beta1.PetClinic) resources.Reconcileable {
+
+	return deployments.From(createDeployment(serviceName, app))
+}
+
+func HorizontalPodAutoscaler(horizontalPodAutoscalerName string, app *examplev1beta1.PetClinic) resources.Reconcileable {
+
+	horizontalPodAutoscaler := &autoscalingv2beta2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      horizontalPodAutoscalerName,
+			Namespace: app.Namespace,
+		},
+		Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				Name:       horizontalPodAutoscalerName,
+				APIVersion: "apps/v1",
+			},
+			MinReplicas: pointer.Int32Ptr(app.Spec.Replicas),
+			MaxReplicas: 5,
+			Metrics: []autoscalingv2beta2.MetricSpec{
+				{
+					Type: "Resource",
+					Resource: &autoscalingv2beta2.ResourceMetricSource{
+						Name: "cpu",
+						Target: autoscalingv2beta2.MetricTarget{
+							Type:               "Utilization",
+							AverageUtilization: pointer.Int32Ptr(40),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return horizontalpodautoscalers.From(horizontalPodAutoscaler)
+}
+
+func getKeys(m map[string]string) []string {
+	// 数组默认长度为map长度,后面append时,不需要重新申请内存和拷贝,效率很高
+	j := 0
+	keys := make([]string, len(m))
+	for k := range m {
+		keys[j] = k
+		j++
+	}
+	return keys
+}
+
+func Application(serviceName string, app *examplev1beta1.PetClinic) resources.Reconcileable {
+
+	deploy := createDeployment(serviceName, app)
+
+	application := &oamv1beta1.Application{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "petclinic-customer",
+			Namespace: app.Namespace,
+		},
+		Spec: oamv1beta1.ApplicationSpec{
+			Components: []common.ApplicationComponent{
+				{
+					Name: "petclinic-customer",
+					Type: "k8s-objects",
+					Properties: &runtime.RawExtension{
+						Object: deploy,
+					},
+				},
+			},
+
+			Policies: []oamv1beta1.AppPolicy{
+				{
+					Name: "topology-default",
+					Type: "topology",
+					Properties: &runtime.RawExtension{
+						Raw: []byte(`{"namespace":"default","clusters":"['k8s-master']"}`),
+					},
+				},
+			},
+			Workflow: &oamv1beta1.Workflow{
+				Steps: []oamv1beta1.WorkflowStep{
+					{
+						Name: "deploy2default",
+						Type: "deploy",
+						Properties: &runtime.RawExtension{
+							Raw: []byte(`{"policies":"['topology-default']"}`),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return applications.From(application)
+}
+
+func createDeployment(serviceName string, app *examplev1beta1.PetClinic) *appsv1.Deployment {
 
 	deployName := serviceName
 	imageName := "youngpig/spring-petclinic-" + serviceName + "-service:1.0.0.RELEASE"
@@ -332,228 +432,5 @@ func Deployment(serviceName string, app *examplev1beta1.PetClinic) resources.Rec
 		},
 	}
 
-	return deployments.From(deployment)
+	return deployment
 }
-
-func HorizontalPodAutoscaler(horizontalPodAutoscalerName string, app *examplev1beta1.PetClinic) resources.Reconcileable {
-
-	horizontalPodAutoscaler := &autoscalingv2beta2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      horizontalPodAutoscalerName,
-			Namespace: app.Namespace,
-		},
-		Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				Name:       horizontalPodAutoscalerName,
-				APIVersion: "apps/v1",
-			},
-			MinReplicas: pointer.Int32Ptr(app.Spec.Replicas),
-			MaxReplicas: 5,
-			Metrics: []autoscalingv2beta2.MetricSpec{
-				{
-					Type: "Resource",
-					Resource: &autoscalingv2beta2.ResourceMetricSource{
-						Name: "cpu",
-						Target: autoscalingv2beta2.MetricTarget{
-							Type:               "Utilization",
-							AverageUtilization: pointer.Int32Ptr(40),
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return horizontalpodautoscalers.From(horizontalPodAutoscaler)
-}
-
-func getKeys(m map[string]string) []string {
-	// 数组默认长度为map长度,后面append时,不需要重新申请内存和拷贝,效率很高
-	j := 0
-	keys := make([]string, len(m))
-	for k := range m {
-		keys[j] = k
-		j++
-	}
-	return keys
-}
-
-//func DeploymentForLogic(deployName string, port int32, app *examplev1beta1.PetClinic) resources.Reconcileable {
-//
-//	isRunAsRoot := true
-//	pIsRunAsRoot := &isRunAsRoot //bool pointer
-//
-//	var runAsUser int64 = 1000321000
-//
-//	hostName := app.Spec.LogicNodeName
-//	if deployName == "search" {
-//		hostName = app.Spec.DataNodeName
-//	}
-//	//imageName := "cp.icr.io/cp/opencontent-audit-webhook@sha256:f4935b3a1687aeb23922fd144f880cc5a4f00404e794a4e30cccd6392cbe29f5"
-//	//if len(strings.TrimSpace(webHook.Spec.DockerRegistryPrefix)) > 0 {
-//	//	imageName = webHook.Spec.DockerRegistryPrefix + "/opencontent-audit-webhook@sha256:f4935b3a1687aeb23922fd144f880cc5a4f00404e794a4e30cccd6392cbe29f5"
-//	//}
-//
-//	// Instantialize the data structure
-//	deployment := &appsv1.Deployment{
-//		ObjectMeta: metav1.ObjectMeta{
-//			Name: deployName,
-//			Labels: map[string]string{
-//				"io.kompose.service": deployName,
-//			},
-//		},
-//		Spec: appsv1.DeploymentSpec{
-//			// The replica should be computed
-//			Replicas: pointer.Int32Ptr(1),
-//			Selector: &metav1.LabelSelector{
-//				MatchLabels: map[string]string{
-//					"io.kompose.service": deployName,
-//				},
-//			},
-//			Strategy: appsv1.DeploymentStrategy{
-//				Type: "Recreate",
-//			},
-//			Template: corev1.PodTemplateSpec{
-//				ObjectMeta: metav1.ObjectMeta{
-//					Labels: map[string]string{
-//						"io.kompose.service": deployName,
-//					},
-//				},
-//				Spec: corev1.PodSpec{
-//					NodeSelector: map[string]string{
-//						"kubernetes.io/hostname": hostName,
-//					},
-//					SecurityContext: &corev1.PodSecurityContext{
-//						RunAsUser:    &runAsUser,
-//						RunAsNonRoot: pIsRunAsRoot,
-//					},
-//					InitContainers: []corev1.Container{{
-//						Image:           "youngpig/configwriter:latest",
-//						ImagePullPolicy: "IfNotPresent",
-//						Name:            "configwriter",
-//
-//						SecurityContext: &corev1.SecurityContext{
-//							RunAsNonRoot: pIsRunAsRoot,
-//						},
-//						Env: []corev1.EnvVar{
-//							{
-//								Name:  "LOGICNODEIP",
-//								Value: app.Spec.LogicNodeIp,
-//							},
-//							{
-//								Name:  "DATANODEIP",
-//								Value: app.Spec.DataNodeIp,
-//							},
-//						},
-//						VolumeMounts: []corev1.VolumeMount{
-//							{
-//								MountPath: "/var/configFiles",
-//								Name:      "varconfig",
-//							},
-//						},
-//					}},
-//					Containers: []corev1.Container{{
-//						Image:           "youngpig/hotel_reservation",
-//						ImagePullPolicy: "IfNotPresent",
-//						Name:            "hotelreservation-" + deployName,
-//						Command:         []string{deployName},
-//						Ports: []corev1.ContainerPort{{
-//							HostPort:      port,
-//							ContainerPort: port,
-//						}},
-//						Lifecycle: &corev1.Lifecycle{
-//							PostStart: &corev1.LifecycleHandler{
-//								Exec: &corev1.ExecAction{
-//									Command: []string{"/bin/sh", "-c", "sleep 5"},
-//								},
-//							},
-//						},
-//						SecurityContext: &corev1.SecurityContext{
-//							RunAsNonRoot: pIsRunAsRoot,
-//						},
-//						VolumeMounts: []corev1.VolumeMount{
-//							{
-//								MountPath: "/go/src/github.com/harlow/go-micro-services/config",
-//								Name:      "varconfig",
-//							},
-//						},
-//					}},
-//					RestartPolicy: corev1.RestartPolicyAlways,
-//					Volumes: []corev1.Volume{
-//						{
-//							Name: "varconfig",
-//							VolumeSource: corev1.VolumeSource{
-//								EmptyDir: &corev1.EmptyDirVolumeSource{},
-//							},
-//						},
-//					},
-//				},
-//			},
-//		},
-//	}
-//
-//	return deployments.From(deployment)
-//}
-//
-//func DeploymentForConsul(app *examplev1beta1.PetClinic) resources.Reconcileable {
-//
-//	//imageName := "cp.icr.io/cp/opencontent-audit-webhook@sha256:f4935b3a1687aeb23922fd144f880cc5a4f00404e794a4e30cccd6392cbe29f5"
-//	//if len(strings.TrimSpace(webHook.Spec.DockerRegistryPrefix)) > 0 {
-//	//	imageName = webHook.Spec.DockerRegistryPrefix + "/opencontent-audit-webhook@sha256:f4935b3a1687aeb23922fd144f880cc5a4f00404e794a4e30cccd6392cbe29f5"
-//	//}
-//
-//	// Instantialize the data structure
-//	deployment := &appsv1.Deployment{
-//		ObjectMeta: metav1.ObjectMeta{
-//			//Namespace: webHook.Namespace,
-//			Name: "consul",
-//			Labels: map[string]string{
-//				"io.kompose.service": "consul",
-//			},
-//		},
-//		Spec: appsv1.DeploymentSpec{
-//			// The replica is computed
-//			Replicas: pointer.Int32Ptr(1),
-//			Selector: &metav1.LabelSelector{
-//				MatchLabels: map[string]string{
-//					"io.kompose.service": "consul",
-//				},
-//			},
-//			Template: corev1.PodTemplateSpec{
-//				ObjectMeta: metav1.ObjectMeta{
-//					Labels: map[string]string{
-//						"io.kompose.service": "consul",
-//					},
-//				},
-//				Spec: corev1.PodSpec{
-//					NodeSelector: map[string]string{
-//						"kubernetes.io/hostname": app.Spec.LogicNodeName,
-//					},
-//					Containers: []corev1.Container{{
-//						Image:           "consul",
-//						ImagePullPolicy: "IfNotPresent",
-//						Name:            "consul",
-//						Ports: []corev1.ContainerPort{{
-//							HostPort:      8300,
-//							ContainerPort: 8300,
-//						}, {
-//							HostPort:      8400,
-//							ContainerPort: 8400,
-//						}, {
-//							HostPort:      8500,
-//							ContainerPort: 8500,
-//						}, {
-//							HostPort:      8600,
-//							ContainerPort: 53,
-//							Protocol:      "UDP",
-//						}},
-//					}},
-//					RestartPolicy: corev1.RestartPolicyAlways,
-//				},
-//			},
-//		},
-//	}
-//
-//	return deployments.From(deployment)
-//}

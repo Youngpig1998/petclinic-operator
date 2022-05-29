@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
 	"github.com/Youngpig1998/petClinic-operator/iaw-shared-helpers/pkg/bootstrap"
 	"github.com/Youngpig1998/petClinic-operator/internal/operator"
@@ -162,10 +161,17 @@ func (r *PetClinicReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	}
 
+	application := operator.Application("customers", instance)
+	err = bootstrapClient.CreateResource("customers", application)
+	if err != nil {
+		log.Error(err, "failed to create KubeVela's application", "Name", "customers")
+		return ctrl.Result{}, err
+	}
+
 	if instance.Spec.ScaleCrossCloud == true && isWatchPod == false {
 		isWatchPod = true
 		time.Sleep(15 * time.Second)
-		go r.WatchPod(ctx, req, instance)
+		go r.WatchPod(ctx, req, instance, bootstrapClient)
 	}
 
 	return ctrl.Result{}, nil
@@ -178,7 +184,7 @@ func (r *PetClinicReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *PetClinicReconciler) WatchPod(ctx context.Context, req ctrl.Request, app *examplev1beta1.PetClinic) {
+func (r *PetClinicReconciler) WatchPod(ctx context.Context, req ctrl.Request, app *examplev1beta1.PetClinic, bootstrapClient *bootstrap.Client) (ctrl.Result, error) {
 
 	log := r.Log.WithValues("pods in cluster", req.NamespacedName)
 
@@ -209,9 +215,12 @@ func (r *PetClinicReconciler) WatchPod(ctx context.Context, req ctrl.Request, ap
 				continue
 			} else {
 				if pods.Items[i].Status.Phase == "Pending" {
-					fmt.Println(pods.Items[0].Name)
-					fmt.Println(pods.Items[0].Status.Reason)
-					fmt.Println(pods.Items[0].Status.Message)
+					//application := operator.Application("customers", app)
+					//err = bootstrapClient.CreateResource("customers", application)
+					//if err != nil {
+					//	log.Error(err, "failed to create KubeVela's application", "Name", "customers")
+					//	return ctrl.Result{}, err
+					//}
 				}
 			}
 

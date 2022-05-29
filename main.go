@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	oamv1beta1 "github.com/oam-dev/kubevela/apis/core.oam.dev/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
@@ -30,7 +31,6 @@ import (
 
 	examplev1beta1 "github.com/Youngpig1998/petClinic-operator/api/v1beta1"
 	"github.com/Youngpig1998/petClinic-operator/controllers"
-	oamv1beta1 "github.com/oam-dev/kubevela/apis/core.oam.dev/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
